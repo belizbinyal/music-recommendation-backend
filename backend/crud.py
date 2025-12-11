@@ -27,7 +27,7 @@ def create_user(db: Session, user: schemas.UserCreate):
     # Şifreyi hashle
     hashed_password = get_password_hash(user.password)
     
-    # Model objesini hazırla
+    # Model objesini hazırla (mapping)
     db_user = models.User(
         username=user.username,
         email=user.email,

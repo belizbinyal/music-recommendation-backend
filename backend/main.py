@@ -1,18 +1,19 @@
 from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
-import json # Vektör listesini stringe çevirmek için lazım
+import json 
 
 # Kendi yazdığımız modülleri içeri alıyoruz
 import models, schemas, crud
 import ai_service 
 from database import SessionLocal, engine
 
-# 1. VERİTABANI OLUŞTURMA (Sihirli Satır)
+# Veritabanı tablolarını oluştur
 models.Base.metadata.create_all(bind=engine)
+
 app = FastAPI()
 
-# --- DEPENDENCY (Bağımlılık Enjeksiyonu) ---
+# --- DEPENDENCY ---
 def get_db():
     db = SessionLocal()
     try:
@@ -20,95 +21,122 @@ def get_db():
     finally:
         db.close()
 
-# --- BAŞLANGIÇTA SORULARI EKLEME (SEEDING) ---
+# ==========================================
+# 1. BAŞLANGIÇ AYARLARI (RAPORA GÖRE GÜNCELLENDİ)
+# ==========================================
 @app.on_event("startup")
 def startup_event():
+    """
+    Uygulama açıldığında veritabanı boşsa,
+    Raporda belirlenen soruları veritabanına ekler.
+    """
     db = SessionLocal()
-    # Eğer tabloda hiç soru yoksa, varsayılanları ekle
     if db.query(models.Question).count() == 0:
-        print("📥 Veritabanı boş, varsayılan sorular ekleniyor...")
+        print("📥 Veritabanı boş, rapordaki sorular ekleniyor...")
         
-# 1. Aktivite Sorusu (GÜNCELLENDİ)
+        # 1. SORU: Aktivite (Rapordaki 8 Madde)
+        activity_options = [
+            "Ders çalışırken 📚",
+            "Spor yaparken 🏃",
+            "Arabada 🚗",
+            "Yürürken 🚶",
+            "Dinlenirken ☕",
+            "Oyun oynarken 🎮",
+            "Yemek yaparken 🍳",
+            "Uyku öncesi 🌙"
+        ]
+        
         q1 = models.Question(
             question_order=1, 
-            text="Genelde ne yaparken müzik dinliyorsun?",  # <--- Burayı değiştirdik
-            type="multi-select", 
-            options=json.dumps(["Kod Yazarken 💻", "Spor Yaparken 🏃", "Ders Çalışırken 📚", "Uzanırken 😴", "Yolda / Seyahatte 🚌"])
+            text="Genelde ne yaparken müzik dinliyorsun?", 
+            type="select", 
+            options=json.dumps(activity_options)
         )
         
-        # 2. Müzik Zevki Sorusu
+        # 2. SORU: Müzik Türü (Rapordaki Türler)
+        genre_options = [
+            "Classic Rock", "Blues", "Metalcore", "Punk", 
+            "J-Pop", "Anime", "Indie Folk", "Vocal Jazz",
+            "Art Pop", "Avant-Garde", "Baroque Pop"
+        ]
+        
         q2 = models.Question(
             question_order=2,
-            text="Hangi türleri seversin?",
+            text="Hangi türleri seversin? (Birden fazla seçebilirsin)",
             type="multi-select",
-            options=json.dumps(["Rock", "Pop", "Rap", "Klasik", "Electronic", "Jazz", "Indie"])
+            options=json.dumps(genre_options)
         )
 
-        # 3. Ruh Hali Sorusu
+        # 3. SORU: Ruh Hali (Rapordaki 7 Duygu) - GÜNCELLENDİ
+        emotion_options = [
+            "Mutluluk 😃",
+            "Üzüntü 😔",
+            "Savaş ⚔️",
+            "Korku 😨",
+            "Sakinlik 😌",
+            "Enerji ⚡",
+            "Aşk ❤️"
+        ]
+
         q3 = models.Question(
             question_order=3,
-            text="Peki modun nasıl? Bize biraz hislerinden bahset.",
-            type="text", 
-            options=None 
+            text="Genelde hangi duygu modunda şarkılar dinlersin?",
+            type="select", 
+            options=json.dumps(emotion_options) 
         )
 
         db.add_all([q1, q2, q3])
         db.commit()
-        print("✅ Sorular başarıyla eklendi!")
+        print("✅ Rapora uygun sorular veritabanına eklendi!")
     
     db.close()
 
-# --- YENİ EKLENECEK API: SORULARI GETİR ---
-@app.get("/content/questions", response_model=List[schemas.Question])
-def get_questions(db: Session = Depends(get_db)):
-    """Frontend'in ekrana çizeceği soruları buradan çekiyoruz"""
-    return db.query(models.Question).order_by(models.Question.question_order).all()
-
-# --- DEPENDENCY (Bağımlılık Enjeksiyonu) ---
-def get_db():
-    db = SessionLocal()
-    try:
-        yield db
-    finally:
-        db.close()
-
-# --- API ENDPOINTLERİ ---
+# ==========================================
+# 2. API ENDPOINTLERİ
+# ==========================================
 
 @app.get("/")
 def home():
     return {"message": "Sistem Aktif! /docs adresine giderek test et."}
 
-# 1. KAYIT OL (Register)
+# --- SORULARI GETİR ---
+@app.get("/content/questions", response_model=List[schemas.Question])
+def get_questions(db: Session = Depends(get_db)):
+    """Frontend'in ekrana çizeceği soruları buradan çekiyoruz"""
+    return db.query(models.Question).order_by(models.Question.question_order).all()
+
+# --- KULLANICI KAYIT ---
 @app.post("/users/", response_model=schemas.User)
 def create_user(user: schemas.UserCreate, db: Session = Depends(get_db)):
-    # Önce email var mı diye kontrol et
     db_user = crud.get_user_by_email(db, email=user.email)
     if db_user:
         raise HTTPException(status_code=400, detail="Bu email zaten kayıtlı.")
-    
-    # Yoksa kaydet
     return crud.create_user(db=db, user=user)
 
-# 2. PROFİL OLUŞTUR / ANKET CEVAPLA (GÜNCELLENEN KISIM)
+# --- PROFİL OLUŞTURMA (NLP BURADA) ---
 @app.post("/users/{user_id}/profile/", response_model=schemas.Profile)
 def create_profile_for_user(
     user_id: int, 
     profile: schemas.ProfileCreate, 
     db: Session = Depends(get_db)
 ):
-    # A. NLP Analizi Yap: Metni 384 boyutlu vektöre çevir
-    # Örnek Çıktı: [0.12, -0.55, 0.98, ...]
-    vector_list = ai_service.get_mood_vector(profile.mood_description)
+    # 1. ÇORBA YAPMA (SOUP)
+    # 3. sorunun cevabı artık seçmeli geldiği için onu da metne ekliyoruz.
+    combined_text = (
+        f"Aktivite: {profile.hobbies}. "
+        f"Sevdiği Türler: {profile.favorite_genres}. "
+        f"Ruh Hali: {profile.mood_description}"
+    )
+
+    # 2. NLP ile Vektör Hesapla
+    vector_list = ai_service.get_mood_vector(combined_text)
     
-    # B. Formatla: Listeyi veritabanında saklanabilir JSON String'e çevir
-    # Örnek Çıktı: "[0.12, -0.55, 0.98, ...]" (Tırnak içinde yazı oldu)
+    # 3. Vektörü String'e çevir
     vector_json_str = json.dumps(vector_list)
     
-    # C. Konsola Bilgi Ver (İşlem başarılı mı görelim)
     print(f"🤖 NLP Vektörü Oluştu. Boyut: {len(vector_list)}")
 
-    # D. Veritabanına Kaydet (Vektör stringini de gönderiyoruz)
-    # NOT: crud.py dosyasındaki fonksiyonun bu parametreyi alacak şekilde güncellenmiş olması lazım!
+    # 4. Kaydet
     return crud.create_user_profile(
         db=db, 
         profile=profile, 
@@ -116,10 +144,19 @@ def create_profile_for_user(
         mood_vector_json=vector_json_str 
     )
 
-# 3. KULLANICI DETAYINI GETİR
 @app.get("/users/{user_id}", response_model=schemas.User)
 def read_user(user_id: int, db: Session = Depends(get_db)):
     db_user = db.query(models.User).filter(models.User.id == user_id).first()
     if db_user is None:
         raise HTTPException(status_code=404, detail="Kullanıcı bulunamadı")
     return db_user
+
+# --- ÖNERİ SİSTEMİ (Şimdilik boş döner, sonra dataset eklenince çalışacak) ---
+import recommendation 
+@app.get("/users/{user_id}/recommendations/")
+def get_recommendations(user_id: int, db: Session = Depends(get_db)):
+    matches = recommendation.get_similar_users(db, current_user_id=user_id)
+    return {
+        "user_id": user_id,
+        "recommended_users": matches
+    }

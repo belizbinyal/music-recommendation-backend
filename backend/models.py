@@ -10,8 +10,9 @@ class User(Base):
     email = Column(String, unique=True, index=True)
     password_hash = Column(String) 
     
-    # User ile Profile arasında ilişki kuruyoruz (One-to-One)
     profile = relationship("UserProfile", back_populates="owner", uselist=False)
+    # listening_history ilişkisini buraya ekleyebiliriz (opsiyonel ama iyi olur)
+    listening_history = relationship("ListeningHistory", back_populates="user")
 
 class UserProfile(Base):
     __tablename__ = "user_profiles"
@@ -19,31 +20,39 @@ class UserProfile(Base):
     id = Column(Integer, primary_key=True, index=True)
     user_id = Column(Integer, ForeignKey("users.id")) 
     
-    # Demografik Veriler
     age = Column(Integer)
     location = Column(String)
-    
-    # Anket Cevapları 
-    hobbies = Column(String)          
-    favorite_genres = Column(String)  
-    
-    # NLP Modelinin Besleneceği Veri
+    hobbies = Column(String)
+    favorite_genres = Column(String)
     mood_description = Column(String) 
-    
-    # NLP Tarafından Üretilen Vektör
-    # SQLite'da "Liste" tipi olmadığı için vektörü JSON string olarak saklayacağız.
-    # Örn: "[0.123, -0.45, 0.88 ...]"
-    mood_vector = Column(String) 
+    mood_vector = Column(String) # Vektör verisi
+
     owner = relationship("User", back_populates="profile")
 
-    # --- GÜNCELLENEN QUESTION SINIFI ---
 class Question(Base):
     __tablename__ = "questions"
 
     id = Column(Integer, primary_key=True, index=True)
-    text = Column(String)       # Soru metni
+    text = Column(String)       
     question_order = Column(Integer)
+    type = Column(String)       
+    options = Column(String)    
+
+# --- YENİ EKLENEN TABLOLAR ---
+
+class Song(Base):
+    __tablename__ = "songs"
+
+    id = Column(Integer, primary_key=True, index=True)
+    title = Column(String, unique=True, index=True) 
+    # İstersen artist, genre vs. eklenebilir ama şu anlık title yeterli
+
+class ListeningHistory(Base):
+    __tablename__ = "listening_history"
+
+    id = Column(Integer, primary_key=True, index=True)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    song_id = Column(Integer, ForeignKey("songs.id"))
     
-    # YENİ EKLENENLER:
-    type = Column(String)       # "text", "select", "multi-select"
-    options = Column(String)    # Seçenekler JSON String olarak: '["Koşu", "Uyku"]'
+    user = relationship("User", back_populates="listening_history")
+    song = relationship("Song")
