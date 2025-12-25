@@ -2,6 +2,7 @@ from fastapi import FastAPI, Depends, HTTPException
 from sqlalchemy.orm import Session
 from typing import List
 import json 
+from playlist_service import PlaylistManager
 
 # Kendi yazdığımız modülleri içeri alıyoruz
 import models, schemas, crud
@@ -160,3 +161,46 @@ def get_recommendations(user_id: int, db: Session = Depends(get_db)):
         "user_id": user_id,
         "recommended_users": matches
     }
+
+# --- PLAYLIST ENDPOINTLERİ ---
+
+@app.post("/users/{user_id}/playlists/", response_model=schemas.PlaylistOut)
+def create_playlist(user_id: int, playlist: schemas.PlaylistCreate, db: Session = Depends(get_db)):
+    """Yeni özel playlist oluşturur (Max 40 kontrolü var)"""
+    manager = PlaylistManager(db)
+    return manager.create_playlist(user_id=user_id, name=playlist.name, is_favorite=False)
+
+@app.get("/users/{user_id}/playlists/", response_model=List[schemas.PlaylistOut])
+def get_playlists(user_id: int, db: Session = Depends(get_db)):
+    """Kullanıcının tüm playlistlerini getirir"""
+    manager = PlaylistManager(db)
+    return manager.get_user_playlists(user_id)
+
+@app.get("/users/{user_id}/favorites/", response_model=schemas.PlaylistOut)
+def get_favorites(user_id: int, db: Session = Depends(get_db)):
+    """Sadece favorilenler listesini döner"""
+    manager = PlaylistManager(db)
+    return manager.get_favorites_playlist(user_id)
+
+# --- ŞARKI EKLEME / ÇIKARMA ---
+
+@app.post("/playlists/{playlist_id}/songs/{song_id}")
+def add_song_to_playlist(playlist_id: int, song_id: int, db: Session = Depends(get_db)):
+    """Bir playliste şarkı ekler (Max 500 kontrolü var)"""
+    manager = PlaylistManager(db)
+    manager.add_song_to_playlist(playlist_id, song_id)
+    return {"message": "Şarkı playliste eklendi."}
+
+@app.delete("/playlists/{playlist_id}/songs/{song_id}")
+def remove_song_from_playlist(playlist_id: int, song_id: int, db: Session = Depends(get_db)):
+    """Bir playlistten şarkı siler"""
+    manager = PlaylistManager(db)
+    return manager.remove_song_from_playlist(playlist_id, song_id)
+
+# --- FAVORİLEME BUTONU ---
+
+@app.post("/users/{user_id}/favorites/toggle/{song_id}")
+def toggle_favorite_song(user_id: int, song_id: int, db: Session = Depends(get_db)):
+    """Kalp butonuna basınca çalışır. Varsa siler, yoksa en üste ekler."""
+    manager = PlaylistManager(db)
+    return manager.toggle_favorite(user_id, song_id)

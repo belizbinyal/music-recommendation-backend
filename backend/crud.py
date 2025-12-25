@@ -17,7 +17,7 @@ def verify_password(plain_password, hashed_password):
 
 # --- VERİTABANI İŞLEMLERİ (CRUD) ---
 
-# 1. Kullanıcı Bul (Email ile)
+# 1. csvıcı Bul (Email ile)
 def get_user_by_email(db: Session, email: str):
     # SQL karşılığı: SELECT * FROM users WHERE email = '...'
     return db.query(models.User).filter(models.User.email == email).first()
@@ -54,3 +54,17 @@ def create_user_profile(db: Session, profile: schemas.ProfileCreate, user_id: in
 # 4. Profil Getir (Eşleştirme/Öneri için lazım olacak)
 def get_profile_by_user_id(db: Session, user_id: int):
     return db.query(models.UserProfile).filter(models.UserProfile.user_id == user_id).first()
+
+def create_user(db: Session, user: schemas.UserCreate):
+    # ... (Mevcut kodlar) ...
+    db.add(db_user)
+    db.commit()
+    db.refresh(db_user)
+    
+    # --- YENİ EKLENEN KISIM: OTOMATİK FAVORİ LİSTESİ ---
+    fav_playlist = models.Playlist(name="Favorilenler", user_id=db_user.id, is_favorite=True)
+    db.add(fav_playlist)
+    db.commit()
+    # ---------------------------------------------------
+
+    return db_user

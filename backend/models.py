@@ -1,6 +1,8 @@
 from sqlalchemy import Column, Integer, String, ForeignKey
 from sqlalchemy.orm import relationship
 from database import Base
+from datetime import datetime
+from sqlalchemy import Boolean, DateTime
 
 class User(Base):
     __tablename__ = "users"
@@ -13,7 +15,10 @@ class User(Base):
     profile = relationship("UserProfile", back_populates="owner", uselist=False)
     # listening_history ilişkisini buraya ekleyebiliriz (opsiyonel ama iyi olur)
     listening_history = relationship("ListeningHistory", back_populates="user")
-
+    # --- İŞTE EKSİK OLAN SATIR BU ---
+    playlists = relationship("Playlist", back_populates="owner") 
+    # --------------------------------
+ 
 class UserProfile(Base):
     __tablename__ = "user_profiles"
 
@@ -56,3 +61,31 @@ class ListeningHistory(Base):
     
     user = relationship("User", back_populates="listening_history")
     song = relationship("Song")
+
+#PLAYLİST KISMI EKLENENLER
+class Playlist(Base):
+    __tablename__ = "playlists"
+
+    id = Column(Integer, primary_key=True, index=True)
+    name = Column(String)
+    user_id = Column(Integer, ForeignKey("users.id"))
+    is_favorite = Column(Boolean, default=False) # Bu liste "Favorilenler" mi?
+
+    # İlişkiler
+    owner = relationship("User", back_populates="playlists")
+    # Playlist içindeki şarkıları tutan ara tablo ilişkisi
+    items = relationship("PlaylistItem", back_populates="playlist", cascade="all, delete-orphan")
+
+class PlaylistItem(Base):
+    __tablename__ = "playlist_items"
+
+    id = Column(Integer, primary_key=True, index=True)
+    playlist_id = Column(Integer, ForeignKey("playlists.id"))
+    song_id = Column(Integer, ForeignKey("songs.id"))
+    added_at = Column(DateTime, default=datetime.utcnow) # Sıralama için zaman damgası
+
+    playlist = relationship("Playlist", back_populates="items")
+    song = relationship("Song")
+
+# User sınıfının içine şu satırı eklemeyi unutma (relationship):
+# playlists = relationship("Playlist", back_populates="owner")

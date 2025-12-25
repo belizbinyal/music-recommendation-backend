@@ -1,5 +1,6 @@
 from pydantic import BaseModel, EmailStr
 from typing import List, Optional
+from datetime import datetime
 
 # --- QUESTION ŞEMALARI (GÜNCELLENDİ) ---
 class QuestionBase(BaseModel):
@@ -58,5 +59,30 @@ class User(UserBase):
     is_active: bool = True
     profile: Optional[Profile] = None # Eğer profili varsa onu da göster
 
+    class Config:
+        from_attributes = True
+
+
+# --- PLAYLİST ŞEMALARI (YENİ EKLENDİ) ---
+class SongBase(BaseModel):
+    id: int
+    title: str
+    class Config:
+        from_attributes = True
+
+class PlaylistCreate(BaseModel):
+    name: str
+
+class PlaylistItemOut(BaseModel):
+    song: SongBase
+    added_at: datetime
+    class Config:
+        from_attributes = True
+
+class PlaylistOut(BaseModel):
+    id: int
+    name: str
+    is_favorite: bool
+    items: List[PlaylistItemOut] = []
     class Config:
         from_attributes = True
