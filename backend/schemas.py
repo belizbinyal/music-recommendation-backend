@@ -67,6 +67,10 @@ class User(UserBase):
 class SongBase(BaseModel):
     id: int
     title: str
+    artist: str | None = None
+    genre: str | None = None
+    theme: str | None = None
+
     class Config:
         from_attributes = True
 

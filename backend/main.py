@@ -3,6 +3,10 @@ from sqlalchemy.orm import Session
 from typing import List
 import json 
 from playlist_service import PlaylistManager
+import csv
+import ast
+import os
+
 
 # Kendi yazdığımız modülleri içeri alıyoruz
 import models, schemas, crud
@@ -89,8 +93,61 @@ def startup_event():
         db.add_all([q1, q2, q3])
         db.commit()
         print("✅ Rapora uygun sorular veritabanına eklendi!")
-    
+    if db.query(models.Song).count() == 0:
+        print("📥 Şarkı veritabanı hazırlanıyor...")
+        
+        # Senin verdiğin dosya yolu
+        csv_path = r"C:\Users\Beliz\Desktop\music_project\backend\songs_labeled_FINAL_EN_TR_THEME_TFIDF_v2.csv"
+        
+        if not os.path.exists(csv_path):
+            print(f"❌ HATA: Dosya bulunamadı -> {csv_path}")
+            # Alternatif: Dosya proje klasöründeyse sadece ismini dene
+            csv_path = "songs_labeled_FINAL_EN_TR_THEME_TFIDF_v2.csv"
+
+        if os.path.exists(csv_path):
+            try:
+                with open(csv_path, "r", encoding="utf-8") as f:
+                    reader = csv.DictReader(f)
+                    songs_to_add = []
+                    
+                    print(f"📂 CSV Okunuyor: {csv_path}")
+                    
+                    for row in reader:
+                        # --- VERİ TEMİZLEME ---
+                        
+                        # 1. Sanatçı İsmi Temizliği (['Artist'] -> Artist)
+                        artist_raw = row.get("artists", "Bilinmiyor") # CSV'deki sütun adı 'artists' ise
+                        try:
+                            if artist_raw.startswith("['"):
+                                artist_list = ast.literal_eval(artist_raw)
+                                artist_clean = ", ".join(artist_list)
+                            else:
+                                artist_clean = artist_raw
+                        except:
+                            artist_clean = artist_raw
+
+                        # 2. Sütun Eşleştirme
+                        # CSV başlıklarının tam olarak böyle olduğunu varsayıyorum.
+                        # Değilse row["..."] içindeki kısımları CSV'ne göre değiştir.
+                        song = models.Song(
+                            title=row.get("name", "İsimsiz"),   # CSV'de 'name' mi 'track_name' mi kontrol et
+                            artist=artist_clean,
+                            genre=row.get("genre", "Genel"),
+                            theme=row.get("THEME", None) or row.get("emotion_final_adjusted", None) # Hangi sütun varsa
+                        )
+                        songs_to_add.append(song)
+                    
+                    # Veritabanına kaydet
+                    db.add_all(songs_to_add)
+                    db.commit()
+                    print(f"✅ Başarılı: {len(songs_to_add)} şarkı veritabanına yüklendi!")
+                    
+            except Exception as e:
+                print(f"❌ Şarkılar yüklenirken hata oluştu: {e}")
+        else:
+            print("⚠️ CSV dosyası bulunamadığı için şarkı yüklenemedi.")
     db.close()
+
 
 # ==========================================
 # 2. API ENDPOINTLERİ

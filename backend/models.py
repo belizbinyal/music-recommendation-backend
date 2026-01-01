@@ -49,8 +49,12 @@ class Song(Base):
     __tablename__ = "songs"
 
     id = Column(Integer, primary_key=True, index=True)
-    title = Column(String, unique=True, index=True) 
-    # İstersen artist, genre vs. eklenebilir ama şu anlık title yeterli
+    title = Column(String, index=True)  # unique=True KALDIRDIK (Aynı isimde farklı şarkılar olabilir)
+    artist = Column(String)             # Sanatçı
+    genre = Column(String)              # Tür
+    theme = Column(String)              # Tema/Mood (CSV'deki Theme sütunu için)
+    url = Column(String, nullable=True) # İleride Spotify linki vs. gerekirse diye
+
 
 class ListeningHistory(Base):
     __tablename__ = "listening_history"
